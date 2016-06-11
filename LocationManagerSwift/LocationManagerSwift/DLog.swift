@@ -9,9 +9,13 @@
 import Foundation
 
 class DLog {
-    class func print(items: Any) {
+    class func print(items: Any, filePath: String = #file, function: String = #function) {
+        var className = ""
+        if let rangeOfSlash = filePath.rangeOfString("/", options: .BackwardsSearch, range: nil, locale: nil) {
+            className = String(filePath.characters.suffixFrom(rangeOfSlash.endIndex))
+        }
         #if DEBUG
-            print("\(items) \(#function)\n")
+            Swift.print("\(className) - \(function) - \(items)\n")
         #endif
     }
 }
