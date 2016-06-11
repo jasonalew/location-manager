@@ -28,10 +28,12 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     var bestEffortAtLocation: CLLocation?
     var timer: NSTimer?
     
+    // MARK: - Init
     init(locationAccuracy: CLLocationAccuracy? = nil) {
         super.init()
         locationManager.delegate = self
-        locationManager.desiredAccuracy = locationAccuracy != nil ? locationAccuracy! : kCLLocationAccuracyNearestTenMeters
+        locationManager.desiredAccuracy =
+            locationAccuracy != nil ? locationAccuracy! : kCLLocationAccuracyNearestTenMeters
         checkLocationAuthorizationStatus()
     }
     
@@ -47,6 +49,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         bestEffortAtLocation = nil
     }
     
+    // MARK: - Actions
     func cancelTimer() {
         timer?.invalidate()
         timer = nil
@@ -64,14 +67,22 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         
         // Stop the Core Location Manager after delay
         cancelTimer()
-        timer = NSTimer.scheduledTimerWithTimeInterval(LocationTimeInterval.timeout, target: self, selector: #selector(LocationManager.startUpdatingLocation), userInfo: nil, repeats: false)
+        timer = NSTimer.scheduledTimerWithTimeInterval(
+            LocationTimeInterval.timeout,
+            target: self,
+            selector: #selector(LocationManager.stopUpdatingLocationWithDelayedRestart),
+            userInfo: nil, repeats: false)
     }
     
     func stopUpdatingLocationWithDelayedRestart() {
         // The location update is suspended to limit power consumption
         locationManager.stopUpdatingLocation()
         cancelTimer()
-        timer = NSTimer.scheduledTimerWithTimeInterval(LocationTimeInterval.restartAfter, target: self, selector: #selector(LocationManager.startUpdatingLocation), userInfo: nil, repeats: false)
+        timer = NSTimer.scheduledTimerWithTimeInterval(
+            LocationTimeInterval.restartAfter,
+            target: self,
+            selector: #selector(LocationManager.startUpdatingLocation),
+            userInfo: nil, repeats: false)
     }
     
     func checkLocationAuthorizationStatus() {
@@ -100,7 +111,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             return
         }
         
-        // Test is the new location is more accurate
+        // Test if the new location is more accurate
         if bestEffortAtLocation == nil || bestEffortAtLocation?.horizontalAccuracy > newLocation.horizontalAccuracy {
             bestEffortAtLocation = newLocation
             

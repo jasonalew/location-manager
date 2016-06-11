@@ -10,13 +10,14 @@ import UIKit
 import MapKit
 
 class MapViewController: UIViewController {
-    
+    // MARK: - Properties
     let locationManager = LocationManager()
 
     @IBOutlet weak var latitudeLabel: UILabel!
     @IBOutlet weak var longitudeLabel: UILabel!
     @IBOutlet weak var mapView: MKMapView!
     
+    // MARK: View Controller
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -30,6 +31,7 @@ class MapViewController: UIViewController {
         // Dispose of any resources that can be recreated.
     }
     
+    // MARK: - Actions
     func updateUI(location: CLLocation) {
         updateLocationLabels(location)
         updateMapLocation(location)
@@ -49,6 +51,7 @@ class MapViewController: UIViewController {
     }
 }
 
+// MARK: - Location Manager Delegate
 extension MapViewController: LocationManagerDelegate {
     func foundInitialLocation(location: CLLocation) {
         updateUI(location)
