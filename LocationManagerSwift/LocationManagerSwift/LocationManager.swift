@@ -1,6 +1,6 @@
 //
 //  LocationManager.swift
-//  Vimli
+//  LocationManagerSwift
 //
 //  Created by Jason Lew on 5/21/16.
 //  Copyright © 2016 Jason Lew. All rights reserved.
