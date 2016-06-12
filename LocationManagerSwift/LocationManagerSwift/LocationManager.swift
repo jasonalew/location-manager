@@ -16,17 +16,11 @@ protocol LocationManagerDelegate: class {
 
 class LocationManager: NSObject, CLLocationManagerDelegate {
     
-    struct LocationTimeInterval {
-        static let timeout = NSTimeInterval(30)
-        static let restartAfter = NSTimeInterval(60)
-    }
-    
     // MARK: - Properties
     weak var delegate: LocationManagerDelegate?
     
     lazy var locationManager = CLLocationManager()
     var bestEffortAtLocation: CLLocation?
-    var timer: NSTimer?
     
     // MARK: - Init
     init(locationAccuracy: CLLocationAccuracy? = nil) {
@@ -34,6 +28,8 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         locationManager.delegate = self
         locationManager.desiredAccuracy =
             locationAccuracy != nil ? locationAccuracy! : kCLLocationAccuracyNearestTenMeters
+        locationManager.activityType = .Other
+        locationManager.pausesLocationUpdatesAutomatically = true
         checkLocationAuthorizationStatus()
     }
     
@@ -42,47 +38,15 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             locationManager.stopUpdatingLocation()
         }
         
-        if timer != nil {
-            cancelTimer()
-        }
-        
         bestEffortAtLocation = nil
     }
     
     // MARK: - Actions
-    func cancelTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
     
     func startLocationServices() {
         if CLLocationManager.locationServicesEnabled() {
             locationManager.requestWhenInUseAuthorization()
         }
-    }
-    
-    func startUpdatingLocation() {
-        DLog.print("Updating location.")
-        locationManager.startUpdatingLocation()
-        
-        // Stop the Core Location Manager after delay
-        cancelTimer()
-        timer = NSTimer.scheduledTimerWithTimeInterval(
-            LocationTimeInterval.timeout,
-            target: self,
-            selector: #selector(LocationManager.stopUpdatingLocationWithDelayedRestart),
-            userInfo: nil, repeats: false)
-    }
-    
-    func stopUpdatingLocationWithDelayedRestart() {
-        // The location update is suspended to limit power consumption
-        locationManager.stopUpdatingLocation()
-        cancelTimer()
-        timer = NSTimer.scheduledTimerWithTimeInterval(
-            LocationTimeInterval.restartAfter,
-            target: self,
-            selector: #selector(LocationManager.startUpdatingLocation),
-            userInfo: nil, repeats: false)
     }
     
     func checkLocationAuthorizationStatus() {
@@ -93,55 +57,53 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         case .Denied, .Restricted:
             DLog.print("Location services not available.")
         case .AuthorizedWhenInUse, .AuthorizedAlways:
-            startUpdatingLocation()
-        }
-    }
-    
-    func locationManager(manager: CLLocationManager, didUpdateToLocation newLocation: CLLocation, fromLocation oldLocation: CLLocation) {
-        // Test that it isn't an invalid measurement
-        if newLocation.horizontalAccuracy < 0 {
-            bestEffortAtLocation = nil
-            return
-        }
-        
-        // Test if the location is cached
-        let locationAge = -(newLocation.timestamp.timeIntervalSinceNow)
-        if locationAge > 5.0 {
-            bestEffortAtLocation = nil
-            return
-        }
-        
-        // Test if the new location is more accurate
-        if bestEffortAtLocation == nil || bestEffortAtLocation?.horizontalAccuracy > newLocation.horizontalAccuracy {
-            bestEffortAtLocation = newLocation
-            
-            delegate?.foundInitialLocation(newLocation)
-            
-            // Test if it meets the desired accuracy
-            if newLocation.horizontalAccuracy <= locationManager.desiredAccuracy {
-                // The measurement satisfies the requirement. Stop Core Location and cancel the previous timer.
-                if let location = bestEffortAtLocation {
-                    delegate?.bestEffortLocationFound(location)
-                }
-                DLog.print("Best effort location: \(bestEffortAtLocation)")
-                stopUpdatingLocationWithDelayedRestart()
-            }
+            locationManager.startUpdatingLocation()
         }
     }
     
     func locationManager(manager: CLLocationManager, didChangeAuthorizationStatus status: CLAuthorizationStatus) {
         switch status {
         case .AuthorizedWhenInUse, .AuthorizedAlways:
-            startUpdatingLocation()
+            locationManager.startUpdatingLocation()
         case .Denied, .Restricted:
             locationManager.stopUpdatingLocation()
         case .NotDetermined:
             startLocationServices()
         }
     }
-}
-
-private extension Selector {
-    static let startUpdatingLocation = #selector(LocationManager.startUpdatingLocation)
-    static let stopUpdatingLocationWithDelayedRestart = #selector(LocationManager.stopUpdatingLocationWithDelayedRestart)
+    
+    func locationManager(manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else {
+            DLog.print("No valid location")
+            return
+        }
+        // Test that it isn't an invalid measurement
+        if location.horizontalAccuracy < 0 {
+            bestEffortAtLocation = nil
+            return
+        }
+        
+        // Test if the location is cached
+        let locationAge = -(location.timestamp.timeIntervalSinceNow)
+        if locationAge > 5.0 {
+            bestEffortAtLocation = nil
+            return
+        }
+        
+        // Test if the new location is more accurate
+        if bestEffortAtLocation == nil || bestEffortAtLocation?.horizontalAccuracy > location.horizontalAccuracy {
+            bestEffortAtLocation = location
+            
+            delegate?.foundInitialLocation(location)
+            
+            // Test if it meets the desired accuracy
+            if location.horizontalAccuracy <= locationManager.desiredAccuracy {
+                // The measurement satisfies the requirement.
+                if let bestEffortLocation = bestEffortAtLocation {
+                    delegate?.bestEffortLocationFound(bestEffortLocation)
+                }
+                DLog.print("Best effort location: \(bestEffortAtLocation)")
+            }
+        }
+    }
 }
