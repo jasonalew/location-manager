@@ -16,11 +16,17 @@ protocol LocationManagerDelegate: class {
 
 class LocationManager: NSObject, CLLocationManagerDelegate {
     
+    struct LocationTimeInterval {
+        static let timeout = NSTimeInterval(30)
+        static let restartAfter = NSTimeInterval(60)
+    }
+    
     // MARK: - Properties
     weak var delegate: LocationManagerDelegate?
     
     lazy var locationManager = CLLocationManager()
     var bestEffortAtLocation: CLLocation?
+    var timer: NSTimer?
     
     // MARK: - Init
     init(locationAccuracy: CLLocationAccuracy? = nil) {
@@ -38,10 +44,19 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             locationManager.stopUpdatingLocation()
         }
         
+        if timer != nil {
+            cancelTimer()
+        }
+        
         bestEffortAtLocation = nil
     }
     
     // MARK: - Actions
+    
+    func cancelTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
     
     func startLocationServices() {
         if CLLocationManager.locationServicesEnabled() {
@@ -49,6 +64,31 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
+    func startUpdatingLocation() {
+        DLog.print("Updating location.")
+        locationManager.startUpdatingLocation()
+        
+        // Stop the Core Location Manager after delay
+        cancelTimer()
+        timer = NSTimer.scheduledTimerWithTimeInterval(
+            LocationTimeInterval.timeout,
+            target: self,
+            selector: #selector(LocationManager.stopUpdatingLocationWithDelayedRestart),
+            userInfo: nil, repeats: false)
+    }
+    
+    func stopUpdatingLocationWithDelayedRestart() {
+        // The location update is suspended to limit power consumption
+        locationManager.stopUpdatingLocation()
+        cancelTimer()
+        timer = NSTimer.scheduledTimerWithTimeInterval(
+            LocationTimeInterval.restartAfter,
+            target: self,
+            selector: #selector(LocationManager.startUpdatingLocation),
+            userInfo: nil, repeats: false)
+    }
+    
+    // Add NSLocationWhenInUseUsageDescription to info.plist
     func checkLocationAuthorizationStatus() {
         switch CLLocationManager.authorizationStatus() {
         case .NotDetermined:
@@ -57,7 +97,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         case .Denied, .Restricted:
             DLog.print("Location services not available.")
         case .AuthorizedWhenInUse, .AuthorizedAlways:
-            locationManager.startUpdatingLocation()
+            startUpdatingLocation()
         }
     }
     
@@ -102,6 +142,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
                 if let bestEffortLocation = bestEffortAtLocation {
                     delegate?.bestEffortLocationFound(bestEffortLocation)
                 }
+                stopUpdatingLocationWithDelayedRestart()
                 DLog.print("Best effort location: \(bestEffortAtLocation)")
             }
         }

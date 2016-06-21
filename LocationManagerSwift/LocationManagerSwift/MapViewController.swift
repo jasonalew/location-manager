@@ -22,8 +22,6 @@ class MapViewController: UIViewController {
         super.viewDidLoad()
 
         locationManager.delegate = self
-        
-        mapView.showsUserLocation = true
     }
 
     override func didReceiveMemoryWarning() {
@@ -56,6 +54,7 @@ extension MapViewController: LocationManagerDelegate {
     func foundInitialLocation(location: CLLocation) {
         updateUI(location)
         DLog.print("Initial location: \(location)")
+        mapView.showsUserLocation = true
     }
     
     func bestEffortLocationFound(location: CLLocation) {
